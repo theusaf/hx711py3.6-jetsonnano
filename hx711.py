@@ -4,7 +4,7 @@ import threading
 from logzero import logger
 
 # from https://developer.nvidia.com/embedded/learn/jetson-nano-2gb-devkit-user-guide
-DEFAULT_LINE_MAP: dict[str, dict] = {
+DEFAULT_LINE_MAP = {
     'JETSON_NANO' : {
          3: 'J3',
          5: 'J2',
@@ -40,25 +40,24 @@ DEFAULT_GPIOD_CONSUMER='hx711'
 
 class HX711:
 
-     
-    def get_line_no(self, pin_no:int) -> int:
+    def get_line_no(self, pin_no):
         if not pin_no in self.line_map:
             raise RuntimeError(f"pin:{pin_no} is not found in line map.")
-        line_str:str = self.line_map[pin_no]
-        offset:int = int(line_str[-1])
-        address:str = line_str[:-1]
-        address_num:int = ord(address[0]) - ord('A')
+        line_str = self.line_map[pin_no]
+        offset = int(line_str[-1])
+        address = line_str[:-1]
+        address_num = ord(address[0]) - ord('A')
         if len(address) == 2:
             address_num += ord('Z') - ord('A') + 1
         return address_num * 8 + offset
 
 
-    def __init__(self, dout:int, pd_sck:int, gain:int = 128, mutex:bool = False, chip = None, line_map_name:str = 'JETSON_NANO', custome_line_map:dict = None):
+    def __init__(self, dout, pd_sck, gain = 128, mutex = False, chip = None, line_map_name = 'JETSON_NANO', custom_line_map = None):
         self.line_map = None
         if line_map_name in DEFAULT_LINE_MAP:
             self.line_map = DEFAULT_LINE_MAP[line_map_name]
-        elif custome_line_map:
-            self.line_map:dict[int, str] = custome_line_map
+        elif custom_line_map:
+            self.line_map = custom_line_map
         else:
             raise RuntimeError(f"line_map_name={line_map_name} is not found. You can also specify custome_line_map for your device.")
 
@@ -66,13 +65,13 @@ class HX711:
         if self.chip is None:
             self.chip = gpiod.Chip("0", gpiod.Chip.OPEN_BY_NUMBER)
         self.PD_SCK = self.chip.get_line(self.get_line_no(pd_sck))
-        self.DOUT:int = self.chip.get_line(self.get_line_no(dout))
-        self.mutex_flag:bool = mutex
+        self.DOUT = self.chip.get_line(self.get_line_no(dout))
+        self.mutex_flag = mutex
         if self.mutex_flag:
             # Mutex for reading from the HX711, in case multiple threads in client
             # software try to access get values from the class at the same time.
             self.readLock = threading.Lock()
-        
+
         self.PD_SCK.request(
             consumer=DEFAULT_GPIOD_CONSUMER,
             type=gpiod.LINE_REQ_DIR_OUT
@@ -81,20 +80,20 @@ class HX711:
             consumer=DEFAULT_GPIOD_CONSUMER,
             type=gpiod.LINE_REQ_DIR_IN
         )
-        
-        self.GAIN:int = 0
+
+        self.GAIN = 0
 
         # The value returned by the hx711 that corresponds to your reference
         # unit AFTER dividing by the SCALE.
-        self.REFERENCE_UNIT:int = 1
-        self.REFERENCE_UNIT_B:int = 1
+        self.REFERENCE_UNIT = 1
+        self.REFERENCE_UNIT_B = 1
 
-        self.OFFSET:float = 1.0
-        self.OFFSET_B:float = 1.0
-        self.lastVal:float = 0.0
+        self.OFFSET = 1.0
+        self.OFFSET_B = 1.0
+        self.lastVal = 0.0
 
-        self.byte_format:str = 'MSB'
-        self.bit_format:str = 'MSB'
+        self.byte_format = 'MSB'
+        self.bit_format = 'MSB'
 
         self.set_gain(gain)
 
@@ -102,14 +101,14 @@ class HX711:
         time.sleep(0.1)
 
 
-    def convertFromTwosComplement24bit(self, inputValue) -> int:
+    def convertFromTwosComplement24bit(self, inputValue):
         return -(inputValue & 0x800000) + (inputValue & 0x7fffff)
-    
 
-    def is_ready(self) -> bool:
+
+    def is_ready(self):
         return self.DOUT.get_value() == 0
-    
-     
+
+
     def set_gain(self, gain):
         if gain == 128:
             self.GAIN = 1
@@ -122,9 +121,9 @@ class HX711:
 
         # Read out a set of raw bytes and throw it away.
         self.readRawBytes()
-     
-     
-    def get_gain(self) -> int:
+
+
+    def get_gain(self):
         if self.GAIN == 1:
             return 128
         if self.GAIN == 3:
@@ -134,9 +133,9 @@ class HX711:
 
         # Shouldn't get here.
         return 0
-     
-     
-    def readNextBit(self) -> int:
+
+
+    def readNextBit(self):
        # Clock HX711 Digital Serial Clock (PD_SCK).  DOUT will be
        # ready 1us after PD_SCK rising edge, so we sample after
        # lowering PD_SCL, when we know DOUT will be stable.
@@ -145,8 +144,8 @@ class HX711:
        return self.DOUT.get_value()
 
 
-    def readNextByte(self) -> int:
-       byteValue:int = 0
+    def readNextByte(self):
+       byteValue = 0
 
        # Read bits and build the byte from top, or bottom, depending
        # on whether we are in MSB or LSB bit mode.
@@ -155,14 +154,14 @@ class HX711:
              byteValue <<= 1
              byteValue |= self.readNextBit()
           else:
-             byteValue >>= 1              
+             byteValue >>= 1
              byteValue |= self.readNextBit() * 0x80
 
        # Return the packed byte.
-       return byteValue 
+       return byteValue
 
-     
-    def readRawBytes(self) -> list[int]:
+
+    def readRawBytes(self):
         if self.mutex_flag:
             # Wait for and get the Read Lock, incase another thread is already
             # driving the HX711 serial interface.
@@ -173,9 +172,9 @@ class HX711:
            pass
 
         # Read three bytes of data from the HX711.
-        firstByte:int  = self.readNextByte()
-        secondByte:int = self.readNextByte()
-        thirdByte:int  = self.readNextByte()
+        firstByte = self.readNextByte()
+        secondByte = self.readNextByte()
+        thirdByte  = self.readNextByte()
 
         # HX711 Channel and gain factor are set by number of bits read
         # after 24 data bits.
@@ -186,7 +185,7 @@ class HX711:
         if self.mutex_flag:
             # Release the Read Lock, now that we've finished driving the HX711
             # serial interface.
-            self.readLock.release()           
+            self.readLock.release()
 
         # Depending on how we're configured, return an orderd list of raw byte
         # values.
@@ -195,32 +194,32 @@ class HX711:
         else:
            return [firstByte, secondByte, thirdByte]
 
-          
-    def read_long(self) -> int:
+
+    def read_long(self):
         # Get a sample from the HX711 in the form of raw bytes.
-        dataBytes:list[int] = self.readRawBytes()
+        dataBytes = self.readRawBytes()
 
 
         logger.debug(dataBytes,)
-        
+
         # Join the raw bytes into a single 24bit 2s complement value.
         twosComplementValue = ((dataBytes[0] << 16) |
                                (dataBytes[1] << 8)  |
                                dataBytes[2])
 
-        logger.debug(f"Twos: 0x{twosComplementValue:06x}")
-        
+        logger.debug(f"Twos: 0x{twosComplementValue}")
+
         # Convert from 24bit twos-complement to a signed value.
-        signedIntValue:int = self.convertFromTwosComplement24bit(twosComplementValue)
+        signedIntValue = self.convertFromTwosComplement24bit(twosComplementValue)
 
         # Record the latest sample value we've read.
         self.lastVal = signedIntValue
 
         # Return the sample value we've read from the HX711.
         return int(signedIntValue)
-    
 
-    def read_average(self, times:int = 3) -> float:
+
+    def read_average(self, times = 3):
         # Make sure we've been asked to take a rational amount of samples.
         if times <= 0:
             raise ValueError("HX711()::read_average(): times must >= 1!!")
@@ -236,7 +235,7 @@ class HX711:
 
         # If we're taking a lot of samples, we'll collect them in a list, remove
         # the outliers, then take the mean of the remaining set.
-        valueList:list[int] = []
+        valueList = []
 
         for x in range(times):
             valueList += [self.read_long()]
@@ -244,26 +243,26 @@ class HX711:
         valueList.sort()
 
         # We'll be trimming 20% of outlier samples from top and bottom of collected set.
-        trimAmount:int = int(len(valueList) * 0.2)
+        trimAmount = int(len(valueList) * 0.2)
 
         # Trim the edge case values.
-        valueList:list = valueList[trimAmount:-trimAmount]
+        valueList = valueList[trimAmount:-trimAmount]
 
         # Return the mean of remaining samples.
         return sum(valueList) / len(valueList)
 
-     
+
     # A median-based read method, might help when getting random value spikes
     # for unknown or CPU-related reasons
-    def read_median(self, times:int = 3) -> float:
+    def read_median(self, times = 3):
        if times <= 0:
           raise ValueError("HX711::read_median(): times must be greater than zero!")
-      
+
        # If times == 1, just return a single reading.
        if times == 1:
           return self.read_long()
 
-       valueList:list[int] = []
+       valueList = []
 
        for x in range(times):
           valueList += [self.read_long()]
@@ -276,55 +275,55 @@ class HX711:
        else:
           # If times is even we have to take the arithmetic mean of
           # the two middle values.
-          midpoint:int = len(valueList) / 2
+          midpoint = len(valueList) / 2
           return sum(valueList[midpoint:midpoint+2]) / 2.0
 
-     
+
     # Compatibility function, uses channel A version
-    def get_value(self, times:int = 3) -> float:
+    def get_value(self, times = 3):
         return self.get_value_A(times)
 
 
-    def get_value_A(self, times:int = 3) -> float:
+    def get_value_A(self, times = 3):
         return self.read_median(times) - self.get_offset_A()
 
 
-    def get_value_B(self, times:int = 3) -> float:
+    def get_value_B(self, times = 3):
         # for channel B, we need to set_gain(32)
-        g:int = self.get_gain()
+        g = self.get_gain()
         self.set_gain(32)
         value = self.read_median(times) - self.get_offset_B()
         self.set_gain(g)
         return value
 
-     
+
     # Compatibility function, uses channel A version
-    def get_weight(self, times:int = 3) -> float:
+    def get_weight(self, times = 3):
         return self.get_weight_A(times)
 
 
-    def get_weight_A(self, times:int = 3) -> float:
-        value:float = self.get_value_A(times)
+    def get_weight_A(self, times = 3):
+        value = self.get_value_A(times)
         value = value / self.REFERENCE_UNIT
         return value
 
-     
-    def get_weight_B(self, times:int = 3) -> float:
-        value:float = self.get_value_B(times)
+
+    def get_weight_B(self, times = 3):
+        value = self.get_value_B(times)
         value = value / self.REFERENCE_UNIT_B
         return value
-    
+
 
     # Sets tare for channel A for compatibility purposes
-    def tare(self, times:int = 15) -> float:
+    def tare(self, times = 15):
         return self.tare_A(times)
-        
-    def tare_A(self, times:int = 15) -> float:
+
+    def tare_A(self, times = 15):
         # Backup REFERENCE_UNIT value
-        backupReferenceUnit:int = self.get_reference_unit_A()
+        backupReferenceUnit = self.get_reference_unit_A()
         self.set_reference_unit_A(1)
-        
-        value:float = self.read_average(times)
+
+        value = self.read_average(times)
         logger.debug(f"Tare A value: {value}")
         self.set_offset_A(value)
 
@@ -334,27 +333,27 @@ class HX711:
         return value
 
 
-    def tare_B(self, times:int = 15) -> float:
+    def tare_B(self, times = 15):
         # Backup REFERENCE_UNIT value
-        backupReferenceUnit:int = self.get_reference_unit_B()
+        backupReferenceUnit = self.get_reference_unit_B()
         self.set_reference_unit_B(1)
 
         # for channel B, we need to set_gain(32)
-        backupGain:int = self.get_gain()
+        backupGain = self.get_gain()
         self.set_gain(32)
 
-        value:float = self.read_average(times)
+        value = self.read_average(times)
         logger.debug(f"Tare B value:{value}")
         self.set_offset_B(value)
 
         # Restore gain/channel/reference unit settings.
         self.set_gain(backupGain)
         self.set_reference_unit_B(backupReferenceUnit)
-       
+
         return value
 
-    
-    def set_reading_format(self, byte_format:str = "LSB", bit_format:str = "MSB"):
+
+    def set_reading_format(self, byte_format = "LSB", bit_format = "MSB"):
         if byte_format == "LSB":
             self.byte_format = byte_format
         elif byte_format == "MSB":
@@ -369,32 +368,32 @@ class HX711:
         else:
             raise ValueError("Unrecognised bitformat: \"%s\"" % bit_format)
 
-            
+
     # sets offset for channel A for compatibility reasons
-    def set_offset(self, offset:float):
+    def set_offset(self, offset):
         self.set_offset_A(offset)
 
-    def set_offset_A(self, offset:float):
+    def set_offset_A(self, offset):
         self.OFFSET = offset
 
-    def set_offset_B(self, offset:float):
+    def set_offset_B(self, offset):
         self.OFFSET_B = offset
 
-    def get_offset(self) -> float:
+    def get_offset(self):
         return self.get_offset_A()
 
-    def get_offset_A(self) -> float:
+    def get_offset_A(self):
         return self.OFFSET
 
-    def get_offset_B(self) -> float:
+    def get_offset_B(self):
         return self.OFFSET_B
 
 
-    def set_reference_unit(self, reference_unit:int):
+    def set_reference_unit(self, reference_unit):
         self.set_reference_unit_A(reference_unit)
 
-        
-    def set_reference_unit_A(self, reference_unit:int):
+
+    def set_reference_unit_A(self, reference_unit):
         # Make sure we aren't asked to use an invalid reference unit.
         if reference_unit == 0:
             raise ValueError("HX711::set_reference_unit_A() can't accept 0 as a reference unit!")
@@ -402,8 +401,8 @@ class HX711:
 
         self.REFERENCE_UNIT = reference_unit
 
-        
-    def set_reference_unit_B(self, reference_unit:int):
+
+    def set_reference_unit_B(self, reference_unit):
         # Make sure we aren't asked to use an invalid reference unit.
         if reference_unit == 0:
             raise ValueError("HX711::set_reference_unit_A() can't accept 0 as a reference unit!")
@@ -412,18 +411,18 @@ class HX711:
         self.REFERENCE_UNIT_B = reference_unit
 
 
-    def get_reference_unit(self) -> int:
+    def get_reference_unit(self):
         return self.get_reference_unit_A()
 
-        
-    def get_reference_unit_A(self) -> int:
+
+    def get_reference_unit_A(self):
         return self.REFERENCE_UNIT
 
-        
-    def get_reference_unit_B(self) -> int:
+
+    def get_reference_unit_B(self):
         return self.REFERENCE_UNIT_B
-        
-        
+
+
     def power_down(self):
         if self.mutex_flag:
             # Wait for and get the Read Lock, incase another thread is already
@@ -441,7 +440,7 @@ class HX711:
         if self.mutex_flag:
             # Release the Read Lock, now that we've finished driving the HX711
             # serial interface.
-            self.readLock.release()           
+            self.readLock.release()
 
 
     def power_up(self):
