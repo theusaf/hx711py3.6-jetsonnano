@@ -2,6 +2,8 @@
 
 This library is based on [HX711 for Rasberry Pi](https://github.com/tatobari/hx711py) using [libgpiod](https://github.com/brgl/libgpiod) instead of RPi.GPIO.
 
+This repository is also built specifically to run okay on Python 3.6.9 on Jetson Nano.
+
 ## Motivation for libgpiod on Jetson Nano
 
 HX711 has a sevior timing requirement while reading data from DOUT. We have only 50us between 1 and 0 of PD_SCK pulse. Original hx711py library uses legacy/slow `/sys/class/gpio` interface with RPi.GPIO so that Jetson Nano violates 50us timing.
