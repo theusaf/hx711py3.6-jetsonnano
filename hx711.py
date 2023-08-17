@@ -63,7 +63,7 @@ class HX711:
 
         self.chip = chip
         if self.chip is None:
-            self.chip = gpiod.Chip("0", gpiod.Chip.OPEN_BY_NUMBER)
+            self.chip = gpiod.chip("0", gpiod.chip.OPEN_BY_NUMBER)
         self.PD_SCK = self.chip.get_line(self.get_line_no(pd_sck))
         self.DOUT = self.chip.get_line(self.get_line_no(dout))
         self.mutex_flag = mutex
@@ -72,14 +72,14 @@ class HX711:
             # software try to access get values from the class at the same time.
             self.readLock = threading.Lock()
 
-        self.PD_SCK.request(
-            consumer=DEFAULT_GPIOD_CONSUMER,
-            type=gpiod.LINE_REQ_DIR_OUT
-        )
-        self.DOUT.request(
-            consumer=DEFAULT_GPIOD_CONSUMER,
-            type=gpiod.LINE_REQ_DIR_IN
-        )
+        pd_sck_cfg = gpiod.line_request()
+        pd_sck_cfg.consumer = DEFAULT_GPIOD_CONSUMER
+        pd_sck_cfg.request_type = gpiod.line_request.DIRECTION_OUTPUT
+        self.PD_SCK.request(pd_sck_cfg)
+        dout_cfg = gpiod.line_request()
+        dout_cfg.consumer = DEFAULT_GPIOD_CONSUMER
+        dout_cfg.request_type = gpiod.line_request.DIRECTION_INPUT
+        self.DOUT.request(dout_cfg)
 
         self.GAIN = 0
 
